@@ -518,7 +518,7 @@ subroutine gather_string_offset_info(local_dim, global_dim, offset,&
 
   integer, allocatable :: local_dim_all_proc(:)
   integer, allocatable :: offset_all_proc(:)
-  integer :: i, mpi_status(MPI_STATUS_SIZE)
+  integer :: i, mpi_status_array(MPI_STATUS_SIZE)
 
  !if(rank.eq.0)then
   allocate(local_dim_all_proc(nproc))
@@ -564,7 +564,7 @@ subroutine gather_string_offset_info(local_dim, global_dim, offset,&
     !print *, "buffer_before:",trim(buffer_string)
     !print *, "local_dim_all_proc:",local_dim_all_proc(i+1)
     call MPI_Recv(buffer_string, local_dim_all_proc(i+1), MPI_CHARACTER,&
-                         i, 1, comm, mpi_status, ierr)
+                         i, 1, comm, mpi_status_array, ierr)
     !print *,"buffer_string:", trim(buffer_string)
      string_total=trim(string_total)//buffer_string(1:local_dim_all_proc(i+1))
     enddo
