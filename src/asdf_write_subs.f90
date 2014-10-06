@@ -67,8 +67,8 @@ subroutine define_asdf_data (adios_group, my_group_size, asdf_container, rank, n
   integer :: nrecords
 
   !character                    :: data_type, dummy_blank
-  character(len=2)             :: data_type
-  character(len=32)            :: header, record
+  character(len=200)             :: data_type
+  character(len=200)            :: header, record
   character(len=10)            :: i_string
   character(len=200)           :: dummy
 

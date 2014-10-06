@@ -5,6 +5,8 @@ module asdf_read_subs
 !! 3)write_asdf_file  
   use asdf_manager_mod
   use asdf_data
+  use adios_read_mod
+  use mpi
   implicit none
 
   type sta_info
@@ -12,23 +14,13 @@ module asdf_read_subs
     integer :: loc
   end type sta_info
 
-  !max number of records on one processor(used in allocated station information in
-  !main program)
-  !integer, parameter :: MAXDATA_PER_PROC = 10000
-  !max number of records total(used to read out the string of station info)
-  !integer, parameter :: MAXDATA_TOTAL = 20000
-
-  !include "asdf_constants.h"
-
 contains
 
 subroutine read_asdf_file(file_name, my_asdf, nrecords, &
     station, network, component, receiver_id, option, &
     rank, nproc, comm, ierr)
   
-  !use asdf_data
-
-  character(len=100),intent(in) :: file_name
+  character(len=256),intent(in) :: file_name
   type(asdf_event), intent(inout) :: my_asdf
   integer :: nrecords, option
   character(len=*) :: station(:), network(:), component(:), receiver_id(:)
@@ -38,8 +30,10 @@ subroutine read_asdf_file(file_name, my_asdf, nrecords, &
 
   if(rank.eq.0) print *, "Reading file begin: ", trim(file_name)
 
+  print *,"option:", option
   if(option.eq.0) then
     !option=0, read the data and return the sta, nw, comp and rid
+    print *,"option 0"
     call read_asdf_file_0(file_name, my_asdf, nrecords, &
       station, network, component, receiver_id, &
       rank, nproc, comm, ierr)
@@ -71,10 +65,9 @@ subroutine read_asdf_file_0(file_name, my_asdf, nrecords, &
     rank, nproc, comm, ierr)
 
   use adios_read_mod
-  !use asdf_data
   implicit none
 
-  character(len=100),intent(in) :: file_name
+  character(len=256),intent(in) :: file_name
   type(asdf_event), intent(inout) :: my_asdf
   integer :: nrecords
   character(len=*) :: sta(:), nw(:), comp(:), rid(:)
@@ -85,12 +78,12 @@ subroutine read_asdf_file_0(file_name, my_asdf, nrecords, &
   integer :: resp_flag_int
 
   integer                 :: i
-  integer                 :: vcnt, acnt, tfirst, tlast
+  !integer                 :: vcnt, acnt, tfirst, tlast
   integer                 :: adios_err
 
   integer(kind=8)         :: fh, sel=0
   integer(kind=8),dimension(1)   :: start, count
-  integer(kind=8),dimension(10)  :: dims
+  integer(kind=4),dimension(10)  :: dims
   integer :: dim_array
   integer :: nrecords_total, nrecords_local
   integer :: loc_begin, loc_end
@@ -105,13 +98,22 @@ subroutine read_asdf_file_0(file_name, my_asdf, nrecords, &
   character(len=:), allocatable :: receiver_name, network
   character(len=:), allocatable :: component, receiver_id 
 
-  !>Initialization,Get Varname and Varnumber
+  character(len=256) :: fn11
+
+  fn11=trim(file_name)
+  print *, "fn11:",trim(fn11)
+  print *, "lenth:",len_trim(fn11)
+  print *, "rank, comm:", rank, comm
+
+  !Initialization,Get Varname and Varnumber
   call adios_read_init_method (ADIOS_READ_METHOD_BP, comm, "verbose=2", ierr)
-  call adios_read_open_file (fh, trim(adjustl(file_name)), 0, comm, ierr)
-  call adios_inq_file (fh, vcnt, acnt, tfirst, tlast, ierr)
+  call adios_read_open_file (fh, fn11, 0, comm, ierr)
+  !call adios_inq_file (fh, vcnt, acnt, tfirst, tlast, ierr)
 
   !get the number of records in the asdf file
   call adios_get_scalar (fh,"nrecords",nrecords_total,ierr)
+
+  !Get response info flag
   call adios_get_scalar (fh,"STORE_RESPONSE", resp_flag_int, ierr )
   !change the resp_flag_int(integer) into resp_flag(logical)
   if(resp_flag_int.eq.1)then
@@ -147,6 +149,7 @@ subroutine read_asdf_file_0(file_name, my_asdf, nrecords, &
   call adios_get_scalar (fh, "component", component, ierr)
   call adios_get_scalar (fh, "receiver_id", receiver_id, ierr)
 
+  !=================
   !split the job based on the receiver name(keep 3 components on the same
   !processor)
   call split_job_mpi_complex(nrecords_total,receiver_name, receiver_name_len, &
@@ -185,18 +188,26 @@ subroutine read_asdf_file_0(file_name, my_asdf, nrecords, &
   !-----------------------------------------------
   !>read all the records 
   do i=1, nrecords
+    !Read trace
     loc_string=trim(my_asdf%receiver_name_array(i))//"."//&
                trim(my_asdf%network_array(i))//"."//&
                trim(my_asdf%component_array(i))//"."//&
                trim(my_asdf%receiver_id_array(i))
     !get dim info
     call adios_get_scalar(fh, trim(loc_string)//"/global_dim",dims(1), ierr)
+    !check dim is not too large
+    if(dims(1).gt.MAX_TRACE_LENGTH)then
+      print *, "Array dim is ", dims(1),", which is unnormal!"
+      print *, "Be careful abouth memory issue!"
+    endif
+
     allocate (my_asdf%records(i)%record(dims(1)))
     start(1) = 0
-    count(1) = dims(1)
+    count(1) = int(dims(1),8)
     call adios_selection_boundingbox (sel, 1 , start , count )
     call adios_schedule_read (fh, sel, trim(loc_string)//"/array", 0, 1, &
                                my_asdf%records(i)%record, ierr)
+
     ! Read in instrument response
     if(my_asdf%STORE_RESPONSE) then
       loc_string="RESP."//trim(my_asdf%network_array(i))//"."//&
@@ -226,6 +237,7 @@ subroutine read_asdf_file_0(file_name, my_asdf, nrecords, &
     print *, "my_asdf%event:",my_asdf%event
   endif
 
+  !--------------------------------------
   !read in array
   start(1) = loc_begin-1 
   count(1) = my_asdf%nrecords
@@ -261,11 +273,13 @@ subroutine read_asdf_file_0(file_name, my_asdf, nrecords, &
   call adios_schedule_read (fh, sel, "P_pick/array", 0, 1, my_asdf%P_pick, ierr)
   call adios_schedule_read (fh, sel, "S_pick/array", 0, 1, my_asdf%S_pick, ierr)
 
+  !--------------------------------------
   !perform the read
   call adios_perform_reads (fh, ierr)
   call adios_read_close(fh, ierr)
   call adios_read_finalize_method(ADIOS_READ_METHOD_BP, adios_err)
 
+  !--------------------------------------
   !!return the sta, nw, comp, rid string array
   sta(1:my_asdf%nrecords)=my_asdf%receiver_name_array(1:my_asdf%nrecords)
   nw(1:my_asdf%nrecords)=my_asdf%network_array(1:my_asdf%nrecords)
@@ -293,12 +307,12 @@ subroutine read_asdf_file_1 (file_name, my_asdf, nrecords, &
   integer :: resp_flag_int
 
   integer                 :: i
-  integer                 :: vcnt, acnt, tfirst, tlast
+  !integer                 :: vcnt, acnt, tfirst, tlast
   integer                 :: adios_err
 
   integer(kind=8)         :: fh, sel=0, sel_record=0
   integer(kind=8),dimension(1)   :: start, count
-  integer(kind=8),dimension(10)  :: dims
+  integer(kind=4),dimension(10)  :: dims
   integer(kind=8) :: npoints_read
   integer(kind=8), dimension(nrecords) :: points_array, points_array_temp
   integer :: nrecords_total
@@ -317,7 +331,7 @@ subroutine read_asdf_file_1 (file_name, my_asdf, nrecords, &
   call adios_read_init_method (ADIOS_READ_METHOD_BP, comm, "verbose=2", ierr)
   !print *,"filename",trim(adjustl(file_name))
   call adios_read_open_file (fh, trim(adjustl(file_name)), 0, comm, ierr)
-  call adios_inq_file (fh, vcnt, acnt, tfirst, tlast, ierr)
+  !call adios_inq_file (fh, vcnt, acnt, tfirst, tlast, ierr)
 
   !if(nrecords.eq.0) return
 
@@ -389,11 +403,15 @@ subroutine read_asdf_file_1 (file_name, my_asdf, nrecords, &
     if(points_array(i).gt.0)then
       !print *, trim(loc_string), dims(1)
       call adios_get_scalar(fh, trim(loc_string)//"/global_dim",dims(1), ierr)
+      if(dims(1).gt.MAX_TRACE_LENGTH)then
+        print *, "Array dim is ", dims(1),", which is unnormal!"
+        print *, "Be careful abouth memory issue!"
+      endif
       !print *, i,"dim:", dims(1)
       allocate (my_asdf%records(i)%record(dims(1)))
       my_asdf%npoints(i)=dims(1)
       start(1) = 0
-      count(1) = dims(1)
+      count(1) = int(dims(1),8)
       call adios_selection_boundingbox (sel_record, 1 , start , count )
       call adios_schedule_read (fh, sel_record, trim(loc_string)//"/array", 0, 1, &
             my_asdf%records(i)%record, ierr)
@@ -412,7 +430,7 @@ subroutine read_asdf_file_1 (file_name, my_asdf, nrecords, &
       call adios_get_scalar(fh, trim(loc_string)//"/global_dim", dims(1), ierr)
       my_asdf%responses(i)%response_length = dims(1)
       start(1) = 0
-      count(1) = dims(1)
+      count(1) = int(dims(1),8)
       call adios_selection_boundingbox (sel, 1 , start , count )
       call adios_schedule_read (fh, sel, trim(loc_string)//"/array", 0, 1, &
                                my_asdf%responses(i)%response_string, ierr)
@@ -636,17 +654,21 @@ subroutine split_job_mpi_on_sta_info(nrecords_total, receiver_name,&
   character(len=*) :: sta(:), nw(:), comp(:), rid(:)
   integer(kind=8) :: points_array(:)
 
-  character(len=:), allocatable :: sta_total(:), nw_total(:), comp_total(:), rid_total(:)
+  character(len=20), allocatable, dimension(:):: sta_total, nw_total, comp_total, rid_total
   type(sta_info) :: sta_list(nrecords), sta_total_list(nrecords_total)
   integer :: index_list(128), index_ascii, start_loc, end_loc
   integer :: dim_array
   
   integer :: i,j
 
-  allocate(character(len=20) :: sta_total(nrecords_total))
-  allocate(character(len=20) :: nw_total(nrecords_total))
-  allocate(character(len=20) :: comp_total(nrecords_total))
-  allocate(character(len=20) :: rid_total(nrecords_total))
+  !allocate(character(len=20) :: sta_total(nrecords_total))
+  !allocate(character(len=20) :: nw_total(nrecords_total))
+  !allocate(character(len=20) :: comp_total(nrecords_total))
+  !allocate(character(len=20) :: rid_total(nrecords_total))
+  allocate(sta_total(nrecords_total))
+  allocate(nw_total(nrecords_total))
+  allocate(comp_total(nrecords_total))
+  allocate(rid_total(nrecords_total))
 
   call split_string(receiver_name,receiver_name_len, &
                             sta_total,dim_array,'.')

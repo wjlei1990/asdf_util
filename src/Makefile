@@ -5,14 +5,15 @@ SRCDIR = $(PWD)
 INCDIR = ../include
 LIBDIR = ../lib
 
-CFLAGS=-g -O3 -warn all
+#CFLAGS=-g -O3 -warn all
+CFLAGS=-Wall
 
 ############################
 #compiler option
-FC = ifort
-CC = icc
-MPIFC = mpif90
-MPICC = mpicc
+FC = ftn
+CC = cc
+MPIFC = ftn
+MPICC = cc
 
 _OBJ = asdf_helpers_definitions.o asdf_helpers_writers.o \
 			 asdf_helpers.o asdf_data.o asdf_manager.o \
@@ -33,13 +34,13 @@ PROG = TEST
 default: ${PROG}
 
 $(OBJDIR)/%.o: $(SRCDIR)/%.f90
-	  $(MPIFC) ${CFLAGS} -c -o $@ $< -module $(INCDIR) $(ADIOS_INC)
+	  $(MPIFC) ${CFLAGS} -c -o $@ $< -J $(INCDIR) $(ADIOS_INC)
 
 $(OBJDIR)/%.o: $(SRCDIR)/%.f
-	  $(MPIFC) ${CFLAGS} -c -o $@ $< -module $(INCDIR) $(ADIOS_INC)
+	  $(MPIFC) ${CFLAGS} -c -o $@ $< -J $(INCDIR) $(ADIOS_INC)
 .F.o:
 	$(OBJDIR)/%.o: $(SRCDIR)/%.F
-	  $(MPIFC) ${CFLAGS} -c -o $@ $< -module $(INCDIR) $(ADIOS_INC)
+	  $(MPIFC) ${CFLAGS} -c -o $@ $< -J $(INCDIR) $(ADIOS_INC)
 
 AR_LIB:
 	ar cr $(LIBDIR)/libasdf.a $(OBJDIR)/*.o

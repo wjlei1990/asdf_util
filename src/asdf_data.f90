@@ -4,6 +4,8 @@ module asdf_data
   integer, parameter :: MAXDATA_PER_PROC = 30000
   !max number of records in one asdf file
   integer, parameter :: MAXDATA_TOTAL = 90000
+  !max trace length
+  integer, parameter :: MAX_TRACE_LENGTH = 10000000
 
   type asdf_record
     real(kind=8), allocatable :: record(:)
