@@ -83,6 +83,9 @@ subroutine define_asdf_data (adios_group, my_group_size, asdf_container, rank, n
   !gather info. Here, we only need nrecords_total
   nrecords=asdf_container%nrecords
   call gather_offset_info(nrecords,nrecords_total,offset, rank, nproc, comm, ierr)
+  if (nrecords .eq. 0) then
+    return
+  endif
 
   call define_asdf_local_string_1d_array (adios_group, my_group_size,  13, "", "event", dummy)
 
@@ -250,7 +253,6 @@ subroutine write_asdf_file(asdf_fn, asdf_container, adios_group, rank, nproc, co
   call adios_open (adios_handle, "EVENTS", asdf_fn, "w", comm, adios_err)
   call adios_group_size (adios_handle, adios_groupsize, adios_totalsize, adios_err)
 
-  !call the write sub
   call write_asdf_file_sub (asdf_container, adios_handle, &
                             rank, nproc, comm, ierr)
 
@@ -330,6 +332,10 @@ subroutine write_asdf_file_sub (asdf_container, adios_handle, rank, nproc, comm,
   call gather_string_offset_info(component_len, comp_len_total, comp_offset, &
                                  component, component_total,&
                                  rank, nproc, comm, ierr)
+
+  if (asdf_container%nrecords .eq. 0) then
+    return
+  endif
 
   !===========================
   !write out the string info
