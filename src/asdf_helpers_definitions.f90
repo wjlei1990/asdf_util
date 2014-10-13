@@ -258,8 +258,8 @@ subroutine define_asdf_logical_scalar (adios_group, group_size_inc, &
   ! Local Variables
   integer(kind=8)                  :: varid ! dummy variable, adios use var name
 
-  print *, "define logical here"
-  print *, "name and path:", trim(name), " ;", trim(path)
+  !print *, "define logical here"
+  !print *, "name and path:", trim(name), " ;", trim(path)
   ! adios: 0 == byte == any_data_type(kind=1) 
   call adios_define_var (adios_group, trim(name), trim(path), adios_integer, &
         "", "", "", varid)
@@ -1360,7 +1360,7 @@ subroutine define_asdf_global_1d_string_1d(adios_group, group_size_inc, &
   character(len=256) :: full_name
 
   full_name = trim(path) // trim(array_name)
-  print *,"full name", trim(full_name),"local_dim:",local_dim
+  !print *,"full name", trim(full_name),"local_dim:",local_dim
  
   call define_asdf_global_1d_string_generic(adios_group, group_size_inc, &
       full_name, local_dim)

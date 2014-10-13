@@ -242,8 +242,10 @@ subroutine write_asdf_file(asdf_fn, asdf_container, adios_group, rank, nproc, co
 
   !calculate size
   adios_groupsize = 0
-  print *,"Write out file: ", trim(asdf_fn)
-  print *, "Define adios data structure..."
+  if(rank.eq.0)then
+    print *,"Write out file: ", trim(asdf_fn)
+    print *, "Define adios data structure..."
+  endif
   call define_asdf_data (adios_group, adios_groupsize, asdf_container,&
                          rank, nproc, comm, ierr)
   !print *, "define finished!"
@@ -257,7 +259,13 @@ subroutine write_asdf_file(asdf_fn, asdf_container, adios_group, rank, nproc, co
   !adios close
   call adios_close(adios_handle, adios_err)
   !print *, "adios_err", adios_err
-  if(adios_err.eq.0) then
+  if(adios_err.ne.0) then
+    call exit_MPI(rank,'Failed in writing asdf file:',trim(asdf_fn))
+  endif
+
+  !finish writing and return
+  call MPI_Barrier(comm, ierr)
+  if(rank.eq.0)then
     print *, "Finish writing file:", trim(asdf_fn)
   endif
   !call adios_finalize (rank, adios_err)
@@ -333,7 +341,7 @@ subroutine write_asdf_file_sub (asdf_container, adios_handle, rank, nproc, comm,
 
   !===========================
   !write out the string info
-  print *,"write string"
+  if(rank.eq.0) print *,"write string"
   if(rank.eq.0)then
     call adios_write(adios_handle, "receiver_name", trim(receiver_name_total), adios_err)
     call adios_write(adios_handle, "network", trim(network_total), adios_err)
@@ -342,7 +350,7 @@ subroutine write_asdf_file_sub (asdf_container, adios_handle, rank, nproc, comm,
   endif
 
   !===========================
-  print *,"Write seismic record"
+  if(rank.eq.0) print *,"Write seismic record"
   do i = 1, asdf_container%nrecords
     !write( loc_string, '(I10)' ) i+offset
     loc_string=trim(asdf_container%receiver_name_array(i))//"."//&
@@ -356,7 +364,7 @@ subroutine write_asdf_file_sub (asdf_container, adios_handle, rank, nproc, comm,
 
   !===========================
   if (asdf_container%STORE_RESPONSE) then
-    print *,"Write instrument response"
+    if(rank.eq.0) print *,"Write instrument response"
     do i = 1, asdf_container%nrecords
       write( loc_string, '(I10)' ) i+offset
       loc_string="RESP."//trim(asdf_container%network_array(i))//"."//&
@@ -372,7 +380,7 @@ subroutine write_asdf_file_sub (asdf_container, adios_handle, rank, nproc, comm,
 
   !===========================
   !scalar
-  print *,"write scalar"
+  if(rank.eq.0) print *,"write scalar"
   !if(rank.eq.0)then
     call adios_write(adios_handle, "nrecords", nrecords_total, adios_err)
     call adios_write(adios_handle, "receiver_name_len", rn_len_total, adios_err)
@@ -395,7 +403,7 @@ subroutine write_asdf_file_sub (asdf_container, adios_handle, rank, nproc, comm,
 
   !===========================
   !write out the array using the offset info
-  print *,"write array"
+  if(rank.eq.0) print *,"write array"
   call write_asdf_global_integer_1d_array(adios_handle, rank, nproc, asdf_container%nrecords,&
         nrecords_total, offset, "npoints", asdf_container%npoints)
 

@@ -3,9 +3,7 @@ module asdf_read_subs
 !! 1)define_asdf_data
 !! 2)read_asdf_file
 !! 3)write_asdf_file  
-  use asdf_manager_mod
   use asdf_data
-  use adios_read_mod
   use mpi
   implicit none
 
@@ -20,7 +18,8 @@ subroutine read_asdf_file(file_name, my_asdf, nrecords, &
     station, network, component, receiver_id, option, &
     rank, nproc, comm, ierr)
   
-  character(len=256),intent(in) :: file_name
+  use asdf_data
+  character(len=*),intent(in) :: file_name
   type(asdf_event), intent(inout) :: my_asdf
   integer :: nrecords, option
   character(len=*) :: station(:), network(:), component(:), receiver_id(:)
@@ -65,9 +64,11 @@ subroutine read_asdf_file_0(file_name, my_asdf, nrecords, &
     rank, nproc, comm, ierr)
 
   use adios_read_mod
+  use asdf_manager_mod
+  use asdf_data
   implicit none
 
-  character(len=256),intent(in) :: file_name
+  character(len=*),intent(in) :: file_name
   type(asdf_event), intent(inout) :: my_asdf
   integer :: nrecords
   character(len=*) :: sta(:), nw(:), comp(:), rid(:)
@@ -98,16 +99,9 @@ subroutine read_asdf_file_0(file_name, my_asdf, nrecords, &
   character(len=:), allocatable :: receiver_name, network
   character(len=:), allocatable :: component, receiver_id 
 
-  character(len=256) :: fn11
-
-  fn11=trim(file_name)
-  print *, "fn11:",trim(fn11)
-  print *, "lenth:",len_trim(fn11)
-  print *, "rank, comm:", rank, comm
-
   !Initialization,Get Varname and Varnumber
   call adios_read_init_method (ADIOS_READ_METHOD_BP, comm, "verbose=2", ierr)
-  call adios_read_open_file (fh, fn11, 0, comm, ierr)
+  call adios_read_open_file (fh, file_name, 0, comm, ierr)
   !call adios_inq_file (fh, vcnt, acnt, tfirst, tlast, ierr)
 
   !get the number of records in the asdf file
@@ -293,10 +287,11 @@ subroutine read_asdf_file_1 (file_name, my_asdf, nrecords, &
     rank, nproc, comm, ierr)
 
   use adios_read_mod
+  use asdf_manager_mod
   !use asdf_data
   implicit none
 
-  character(len=100),intent(in) :: file_name
+  character(len=*),intent(in) :: file_name
   integer :: nrecords
   character(len=*) :: sta(:), nw(:), comp(:), rid(:)
   type(asdf_event), intent(inout) :: my_asdf
